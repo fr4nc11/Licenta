@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Servere WebRTC</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root { --bg-main: #0f172a; --bg-card: #1e293b; --text-main: #f8fafc; --text-muted: #94a3b8; --accent: #3b82f6; --accent-hover: #2563eb; --border-color: #334155; }
+        body { background-color: var(--bg-main); color: var(--text-main); font-family: 'Inter', sans-serif; margin: 0; padding: 60px 20px 40px 20px; display: flex; flex-direction: column; align-items: center; background-image: radial-gradient(circle at top, #1e293b 0%, #0f172a 100%); min-height: 100vh; box-sizing: border-box; position: relative; }
+        
+        .top-bar { position: absolute; top: 30px; right: 40px; }
+        .logout-btn { background: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px solid #ef4444; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 600; font-family: 'Inter'; transition: 0.2s; text-decoration: none;}
+        .logout-btn:hover { background: #ef4444; color: white; }
+        
+        .header { text-align: center; margin-bottom: 40px; max-width: 600px; }
+        .header h1 { color: var(--text-main); margin-bottom: 12px; font-weight: 700; font-size: 32px; letter-spacing: -0.5px;}
+        .header h1 span { color: var(--accent); }
+        .header p { color: var(--text-muted); margin: 0; font-size: 15px; line-height: 1.6; }
+        
+        .create-box { background: var(--bg-card); padding: 20px; border-radius: 12px; border: 1px solid var(--border-color); display: flex; gap: 12px; margin-bottom: 50px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); max-width: 500px; width: 100%; box-sizing: border-box; }
+        .create-box input { flex: 1; padding: 12px 16px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-main); color: var(--text-main); font-family: 'Inter'; font-size: 15px; transition: border-color 0.2s, box-shadow 0.2s; }
+        .create-box input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2); }
+        .create-box button { background-color: var(--accent); color: white; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-weight: 600; font-family: 'Inter'; transition: background-color 0.2s; white-space: nowrap; }
+        .create-box button:hover { background-color: var(--accent-hover); }
+        
+        .rooms-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 24px; width: 100%; max-width: 1000px; }
+        .room-card { background: var(--bg-card); padding: 24px; border-radius: 16px; border: 1px solid var(--border-color); text-align: center; transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .room-card:hover { transform: translateY(-5px); box-shadow: 0 12px 24px rgba(0,0,0,0.4); border-color: var(--accent); }
+        .room-card h3 { margin: 0 0 8px 0; color: var(--text-main); font-weight: 600; font-size: 20px;}
+        .room-card p { margin: 0 0 20px 0; color: var(--text-muted); font-size: 13px; }
+        .room-card button { background-color: rgba(59, 130, 246, 0.1); color: var(--accent); border: 1px solid var(--accent); width: 100%; padding: 10px; border-radius: 8px; cursor: pointer; font-weight: 600; font-family: 'Inter', sans-serif; transition: background-color 0.2s, color 0.2s; }
+        .room-card button:hover { background-color: var(--accent); color: white; }
+    </style>
+</head>
+<body>
+
+    <div class="top-bar">
+        <a href="/logout" class="logout-btn">Deconectare</a>
+    </div>
+
+    <div class="header">
+        <h1 id="welcomeMessage">Salut! 👋</h1>
+        <p>Bine ai venit pe platforma noastră. Alătură-te unuia dintre serverele active de mai jos pentru a începe apelul, sau creează rapid propria ta cameră de discuții.</p>
+    </div>
+
+    <div class="create-box">
+        <input type="text" id="newRoomName" placeholder="Numele noii camere...">
+        <button onclick="createRoom()">➕ Creează Server</button>
+    </div>
+
+    <div class="rooms-grid" id="roomsContainer"></div>
+
+    <script>
+        async function fetchUserData() {
+            try {
+                const res = await fetch('/api/me');
+                if (res.ok) {
+                    const data = await res.json();
+                    document.getElementById('welcomeMessage').innerHTML = `Salut, <span>${data.username}</span>! 👋`;
+                }
+            } catch (e) { console.warn("Eroare la preluarea numelui."); }
+        }
+
+        async function fetchRooms() {
+            const response = await fetch('/api/rooms');
+            if (response.status === 401) { window.location.href = '/login.html'; return; }
+            
+            const rooms = await response.json();
+            const container = document.getElementById('roomsContainer');
+            container.innerHTML = '';
+            
+            rooms.forEach(room => {
+                const card = document.createElement('div');
+                card.className = 'room-card';
+                
+                const isFull = room.activeUsers >= 2;
+                const badgeColor = isFull ? '#ef4444' : '#10b981'; 
+                const btnText = isFull ? 'Cameră Plină 🔒' : 'Intră în apel ➔';
+                const btnStyle = isFull ? 'opacity: 0.5; cursor: not-allowed; background-color: #334155; border-color: #334155; color: #94a3b8;' : '';
+
+                card.innerHTML = `
+                    <h3>${room.name}</h3>
+                    <p style="margin-bottom: 10px;">Creată de: <strong>${room.created_by}</strong></p>
+                    <div style="margin-bottom: 20px;">
+                        <span style="background-color: ${badgeColor}; color: white; padding: 4px 12px; border-radius: 50px; font-size: 12px; font-weight: bold; display: inline-flex; align-items: center; gap: 5px;">
+                            👥 ${room.activeUsers} / 2
+                        </span>
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <button onclick="if(!${isFull}) joinServer('${room.name}')" style="flex: 1; ${btnStyle}">${btnText}</button>
+                        <button onclick="deleteRoom('${room.name}')" style="background-color: transparent; border: 1px solid #ef4444; color: #ef4444; width: 44px; padding: 0; display: flex; align-items: center; justify-content: center; font-size: 18px;" title="Șterge Camera">🗑️</button>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        async function createRoom() {
+            const name = document.getElementById('newRoomName').value.trim();
+            if (!name) return alert('Introdu un nume valid!');
+            const response = await fetch('/api/rooms', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ roomName: name })
+            });
+            if (response.ok) { document.getElementById('newRoomName').value = ''; fetchRooms(); }
+            else { alert('Eroare: Camera există deja sau numele este invalid.'); }
+        }
+
+        async function deleteRoom(roomName) {
+            if (!confirm(`Ești sigur că vrei să ștergi definitiv camera "${roomName}"?`)) return;
+            const response = await fetch(`/api/rooms/${encodeURIComponent(roomName)}`, { method: 'DELETE' });
+            const data = await response.json();
+            if (response.ok) fetchRooms(); else alert(data.error); 
+        }
+
+        function joinServer(roomName) { window.location.href = `/room.html?room=${encodeURIComponent(roomName)}`; }
+        
+        fetchUserData();
+        fetchRooms();
+        setInterval(fetchRooms, 3000); 
+    </script>
+</body>
+</html>

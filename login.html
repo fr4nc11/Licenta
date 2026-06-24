@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebRTC - Autentificare</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root { --bg-main: #0f172a; --bg-card: #1e293b; --text-main: #f8fafc; --text-muted: #94a3b8; --accent: #3b82f6; --accent-hover: #2563eb; --success: #10b981; --border-color: #334155; }
+        body { background-color: var(--bg-main); color: var(--text-main); font-family: 'Inter', sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background-image: radial-gradient(circle at top, #1e293b 0%, #0f172a 100%); }
+        .auth-container { background: var(--bg-card); padding: 40px; border-radius: 16px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5); border: 1px solid var(--border-color); width: 100%; max-width: 380px; text-align: center; box-sizing: border-box; }
+        .auth-container h2 { margin-top: 0; margin-bottom: 8px; font-weight: 600; font-size: 24px; }
+        .subtitle { color: var(--text-muted); font-size: 14px; margin-bottom: 24px; }
+        input { width: 100%; padding: 14px; margin-bottom: 16px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-main); color: var(--text-main); font-size: 15px; font-family: 'Inter', sans-serif; box-sizing: border-box; transition: border-color 0.2s, box-shadow 0.2s; }
+        input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2); }
+        .password-wrapper { position: relative; width: 100%; }
+        .password-wrapper input { padding-right: 45px; }
+        .toggle-password { position: absolute; right: 14px; top: 14px; cursor: pointer; color: var(--text-muted); user-select: none; font-size: 16px; transition: 0.2s; }
+        .toggle-password:hover { transform: scale(1.1); }
+        button.primary-btn { background-color: var(--accent); color: white; padding: 14px; font-size: 16px; font-weight: 600; border: none; border-radius: 8px; cursor: pointer; width: 100%; margin-bottom: 16px; font-family: 'Inter', sans-serif; transition: background-color 0.2s, transform 0.1s; }
+        button.primary-btn:hover { background-color: var(--accent-hover); }
+        button.primary-btn:active { transform: scale(0.98); }
+        button.success-btn { background-color: var(--success); }
+        button.success-btn:hover { background-color: #059669; }
+        .toggle-btn { background: none; color: var(--text-muted); border: none; font-size: 14px; cursor: pointer; font-family: 'Inter', sans-serif; transition: color 0.2s; }
+        .toggle-btn:hover { color: var(--text-main); }
+        .error-msg { color: #ef4444; background: rgba(239, 68, 68, 0.1); padding: 10px; border-radius: 6px; font-size: 13px; margin-bottom: 16px; display: none; border: 1px solid rgba(239, 68, 68, 0.2); }
+        #verifyCode { text-align: center; font-size: 24px; letter-spacing: 8px; font-weight: 600; }
+    </style>
+</head>
+<body>
+
+    <div class="auth-container" id="loginBox">
+        <h2>Bine ai venit</h2>
+        <div class="subtitle">Loghează-te pentru a accesa serverele</div>
+        <p id="loginError" class="error-msg"></p>
+        <form id="loginForm">
+            <input type="text" id="loginUsername" placeholder="Nume utilizator" required>
+            <div class="password-wrapper">
+                <input type="password" id="loginPassword" placeholder="Parolă" required>
+                <span class="toggle-password" onclick="togglePassword('loginPassword', this)">👁️</span>
+            </div>
+            <button type="submit" class="primary-btn" id="loginBtn">Intră în cont</button>
+        </form>
+        <button class="toggle-btn" onclick="switchView('registerBox')">Nu ai cont? Creează unul</button>
+    </div>
+
+    <div class="auth-container" id="registerBox" style="display: none;">
+        <h2>Creează cont</h2>
+        <div class="subtitle">Completează datele pentru a începe</div>
+        <p id="regError" class="error-msg"></p>
+        <form id="registerForm">
+            <input type="text" id="regUsername" placeholder="Nume utilizator" required>
+            <input type="email" id="regEmail" placeholder="Adresa de Email" required>
+            <div class="password-wrapper">
+                <input type="password" id="regPassword" placeholder="Parolă" required>
+                <span class="toggle-password" onclick="togglePassword('regPassword', this)">👁️</span>
+            </div>
+            <button type="submit" class="primary-btn" id="regBtn">Continuă</button>
+        </form>
+        <button class="toggle-btn" onclick="switchView('loginBox')">Înapoi la logare</button>
+    </div>
+
+    <div class="auth-container" id="verifyBox" style="display: none;">
+        <h2>Verificare Email</h2>
+        <div class="subtitle">Ți-am trimis un cod de 6 cifre. Introdu-l mai jos pentru a finaliza.</div>
+        <p id="verifyError" class="error-msg"></p>
+        <form id="verifyForm">
+            <input type="text" id="verifyCode" placeholder="000000" required maxlength="6" autocomplete="off">
+            <button type="submit" class="primary-btn success-btn">Verifică și Creează Cont</button>
+        </form>
+        <button class="toggle-btn" onclick="switchView('registerBox')">Anulează</button>
+    </div>
+
+    <div class="auth-container" id="successBox" style="display: none;">
+        <h2 style="color:var(--success)">Cont creat! 🎉</h2>
+        <div class="subtitle">Contul tău a fost creat cu succes. Te poți autentifica acum.</div>
+        <button class="primary-btn" onclick="switchView('loginBox')">Mergi la Logare</button>
+    </div>
+
+    <script>
+        function switchView(viewId) {
+            document.getElementById('loginBox').style.display = 'none';
+            document.getElementById('registerBox').style.display = 'none';
+            document.getElementById('verifyBox').style.display = 'none';
+            document.getElementById('successBox').style.display = 'none';
+            document.getElementById(viewId).style.display = 'block';
+        }
+
+        function togglePassword(inputId, iconElement) {
+            const input = document.getElementById(inputId);
+            if (input.type === "password") {
+                input.type = "text";
+                iconElement.innerText = "🙈"; 
+            } else {
+                input.type = "password";
+                iconElement.innerText = "👁️";
+            }
+        }
+
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('loginBtn');
+            const errorEl = document.getElementById('loginError');
+            btn.innerText = "Se verifică..."; btn.disabled = true; errorEl.style.display = 'none';
+
+            try {
+                const res = await fetch('/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: document.getElementById('loginUsername').value, password: document.getElementById('loginPassword').value })
+                });
+                const data = await res.json();
+                if (res.ok && data.success) window.location.href = data.redirect;
+                else { errorEl.innerText = data.error; errorEl.style.display = 'block'; }
+            } catch (err) { errorEl.innerText = "Eroare de conexiune la server."; errorEl.style.display = 'block'; }
+            btn.innerText = "Intră în cont"; btn.disabled = false;
+        });
+
+        document.getElementById('registerForm').addEventListener('submit', async (e) => {
+            e.preventDefault(); 
+            const btn = document.getElementById('regBtn');
+            const errorEl = document.getElementById('regError');
+            btn.innerText = "Se trimite..."; btn.disabled = true; errorEl.style.display = 'none';
+
+            try {
+                const res = await fetch('/api/register-step1', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: document.getElementById('regUsername').value, email: document.getElementById('regEmail').value, password: document.getElementById('regPassword').value })
+                });
+                const data = await res.json();
+                if (res.ok) switchView('verifyBox');
+                else { errorEl.innerText = data.error; errorEl.style.display = 'block'; }
+            } catch (err) { errorEl.innerText = "Eroare de conexiune."; errorEl.style.display = 'block'; }
+            btn.innerText = "Continuă"; btn.disabled = false;
+        });
+
+        document.getElementById('verifyForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const errorEl = document.getElementById('verifyError');
+            errorEl.style.display = 'none';
+
+            try {
+                const res = await fetch('/api/verify-code', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ code: document.getElementById('verifyCode').value })
+                });
+                const data = await res.json();
+                if (res.ok) switchView('successBox');
+                else { errorEl.innerText = data.error; errorEl.style.display = 'block'; }
+            } catch (err) { errorEl.innerText = "Eroare de conexiune."; errorEl.style.display = 'block'; }
+        });
+    </script>
+</body>
+</html>

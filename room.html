@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Apel - WebRTC Pro</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root { --bg-main: #0f172a; --bg-card: #1e293b; --text-main: #f8fafc; --text-muted: #94a3b8; --accent: #3b82f6; --danger: #ef4444; --border-color: #334155; --overlay: rgba(15, 23, 42, 0.85); }
+        body { background-color: var(--bg-main); color: var(--text-main); font-family: 'Inter', sans-serif; margin: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; overflow: hidden; }
+        
+        #lobby-container { background: var(--bg-card); padding: 40px; border-radius: 16px; box-shadow: 0 10px 40px rgba(0,0,0,0.5); border: 1px solid var(--border-color); max-width: 400px; width: 90%; text-align: center; box-sizing: border-box; }
+        #lobby-container h1 { margin-top: 0; font-size: 24px; margin-bottom: 8px;}
+        #lobbyRoomNameDisplay { color: var(--accent); margin-bottom: 24px; font-weight: 500;}
+        select { padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-main); color: var(--text-main); width: 100%; margin-bottom: 20px; display: block; box-sizing: border-box; font-family: 'Inter'; font-size: 14px; }
+        label { display: block; text-align: left; margin-bottom: 6px; color: var(--text-muted); font-size: 13px; font-weight: 500;}
+        .join-btn { background-color: var(--accent); color: white; padding: 14px; font-size: 16px; font-weight: 600; border: none; border-radius: 8px; cursor: pointer; width: 100%; margin-top: 10px; transition: 0.2s; }
+        .join-btn:hover { background-color: #2563eb; }
+        .back-btn { background-color: var(--bg-main); border: 1px solid var(--border-color); margin-top: 10px;}
+        .back-btn:hover { background-color: var(--border-color); }
+
+        #call-interface { display: none; flex-direction: column; align-items: center; width: 100%; height: 100vh; justify-content: center; position: relative; }
+        .header-info { position: absolute; top: 24px; left: 24px; z-index: 10; background: var(--overlay); padding: 12px 20px; border-radius: 12px; border: 1px solid var(--border-color); backdrop-filter: blur(10px); }
+        .header-info h1 { margin: 0; font-size: 16px; font-weight: 500;}
+        .timer-badge { font-family: monospace; font-size: 18px; color: #10b981; margin-top: 4px; display: block; }
+
+        #network-widget { position: absolute; top: 24px; right: 24px; background: var(--overlay); padding: 16px; backdrop-filter: blur(10px); border-radius: 12px; border: 1px solid var(--border-color); width: 220px; font-size: 13px; z-index: 50; display: none; }
+        #network-widget h3 { margin: 0 0 12px 0; font-size: 13px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px; }
+        .stat-row { display: flex; justify-content: space-between; margin-bottom: 8px; color: var(--text-main);}
+        .stat-val { font-family: monospace; color: #10b981; font-weight: 600; }
+
+        .video-container { display: flex; gap: 24px; padding: 20px; flex-wrap: wrap; justify-content: center; align-items: center; }
+        .video-wrapper { position: relative; width: 640px; height: 360px; background: #000; border-radius: 16px; border: 1px solid var(--border-color); overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.4); }
+        
+        video { width: 100%; height: 100%; object-fit: cover; }
+        #localVideo { transform: scaleX(-1); }
+        .no-mirror { transform: scaleX(1) !important; }
+        .status-overlay { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg-main); align-items: center; justify-content: center; flex-direction: column; z-index: 2; text-align: center; }
+        .mute-icon { display: none; position: absolute; top: 12px; right: 12px; background: var(--danger); color: white; width: 32px; height: 32px; border-radius: 50%; align-items: center; justify-content: center; z-index: 3; font-size: 14px; }
+        .name-tag { position: absolute; bottom: 12px; left: 12px; background: rgba(0,0,0,0.7); padding: 6px 12px; border-radius: 8px; font-size: 13px; font-weight: 500; }
+
+        .controls { position: absolute; bottom: 40px; background: var(--overlay); backdrop-filter: blur(10px); padding: 12px 24px; border-radius: 100px; display: flex; gap: 12px; border: 1px solid var(--border-color); box-shadow: 0 10px 30px rgba(0,0,0,0.5); z-index: 100; align-items: center;}
+        button.control-icon { background-color: var(--bg-card); color: white; border: 1px solid var(--border-color); width: 44px; height: 44px; border-radius: 50%; cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+        button.control-icon:hover { background-color: var(--border-color); transform: translateY(-2px); }
+        button.text-btn { background-color: var(--danger); color: white; border: none; padding: 0 24px; font-size: 15px; font-weight: 600; border-radius: 100px; cursor: pointer; transition: 0.2s; display: none; align-items: center; gap: 8px; height: 44px; font-family: 'Inter'; }
+        button.text-btn:hover { background-color: #dc2626; }
+        .btn-off { background-color: var(--danger) !important; border-color: var(--danger) !important; }
+
+        .chat-container { position: fixed; bottom: 24px; right: 24px; width: 340px; height: 450px; background-color: var(--bg-card); border-radius: 16px; display: flex; flex-direction: column; border: 1px solid var(--border-color); z-index: 200; box-shadow: 0 15px 40px rgba(0,0,0,0.6); overflow: hidden; }
+        .chat-header { padding: 16px; background: var(--bg-main); border-bottom: 1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center; }
+        .chat-messages { flex: 1; padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; scroll-behavior: smooth; }
+        .chat-input-area { display: flex; padding: 12px; border-top: 1px solid var(--border-color); background: var(--bg-main); align-items: center; gap: 8px;}
+        .chat-input-area input[type="text"] { margin-bottom: 0; flex: 1; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-card); color: white;}
+        .message { padding: 10px 14px; border-radius: 12px; max-width: 85%; font-size: 14px; word-wrap: break-word; line-height: 1.4;}
+        .my-msg { background-color: var(--accent); align-self: flex-end; border-bottom-right-radius: 4px;}
+        .remote-msg { background-color: var(--border-color); align-self: flex-start; border-bottom-left-radius: 4px;}
+        .sender-name { display: block; font-size: 11px; font-weight: 700; opacity: 0.8; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+        #settings-panel { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--bg-card); border: 1px solid var(--border-color); padding: 30px; border-radius: 16px; z-index: 300; box-shadow: 0 25px 50px rgba(0,0,0,0.8); width: 320px; }
+    </style>
+</head>
+<body>
+
+    <div id="lobby-container">
+        <h1>👋 Configurare Apel</h1>
+        <div id="lobbyRoomNameDisplay">Se încarcă...</div>
+        <label>📷 Cameră Web</label>
+        <select id="videoSourceLobby"></select>
+        <label>🎙️ Microfon</label>
+        <select id="audioSourceLobby"></select>
+        <button class="join-btn" onclick="joinRoom()">Intră în Cameră</button>
+        <button class="join-btn back-btn" onclick="window.location.href='/dashboard.html'">Înapoi la Servere</button>
+    </div>
+
+    <div id="call-interface">
+        <div class="header-info">
+            <h1>Server: <span id="roomNameDisplay" style="color:var(--accent)"></span></h1>
+            <span id="callTimer" class="timer-badge">00:00</span>
+        </div>
+
+        <div id="network-widget">
+            <h3>Date Conexiune</h3>
+            <div class="stat-row"><span>Bitrate:</span> <span id="stat-bitrate" class="stat-val">0 kbps</span></div>
+            <div class="stat-row"><span>Rezoluție:</span> <span id="stat-res" class="stat-val">0x0</span></div>
+            <div class="stat-row"><span>FPS:</span> <span id="stat-fps" class="stat-val">0</span></div>
+            <div class="stat-row"><span>Pierderi:</span> <span id="stat-loss" class="stat-val" style="color:#f59e0b">0</span></div>
+        </div>
+
+        <div class="video-container">
+            <div class="video-wrapper">
+                <video id="localVideo" autoplay playsinline muted></video>
+                <div class="name-tag" id="localNameTag">Eu</div>
+                <div id="camera-off-overlay" class="status-overlay"><span style="font-size:40px">📷</span><p style="color:var(--text-muted); margin-top:10px;">Camera este oprită</p></div>
+                <div id="mic-off-icon" class="mute-icon">🔇</div>
+            </div>
+
+            <div class="video-wrapper">
+                <video id="remoteVideo" autoplay playsinline></video>
+                <div class="name-tag" id="remoteNameTag">Așteptare partener...</div>
+                <div id="remote-camera-off-overlay" class="status-overlay"><span style="font-size:40px">📷</span><p style="color:var(--text-muted); margin-top:10px;">Camera este oprită</p></div>
+                <div id="remote-mic-off-icon" class="mute-icon">🔇</div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button id="camBtn" class="control-icon" onclick="toggleCamera()" title="Pornește/Oprește Camera">📹</button>
+            <button id="micBtn" class="control-icon" onclick="toggleMic()" title="Activează/Dezactivează Microfonul">🎙️</button>
+            <button id="shareBtn" class="control-icon" onclick="toggleScreenShare()" style="display: none;" title="Partajează Ecranul">🖥️</button>
+            <button id="settingsBtn" class="control-icon" onclick="toggleSettings()" style="display: none;" title="Setări Dispozitive">⚙️</button>
+            <button id="chatBtn" class="control-icon" onclick="toggleChatUI()" style="display: none;" title="Deschide Chat-ul">💬</button>
+            
+            <button id="callBtn" class="text-btn" onclick="hangUp(true); window.location.href='/dashboard.html';" title="Ieși din apel">📞</button>
+        </div>
+
+        <div id="settings-panel">
+            <h3 style="margin-top:0; margin-bottom: 20px; font-weight: 600;">Setări Dispozitive</h3>
+            <label>📷 Schimbă Camera</label><select id="videoSourceCall" onchange="changeCamera()"></select>
+            <label style="margin-top:15px;">🎙️ Schimbă Microfonul</label><select id="audioSourceCall" onchange="changeMic()"></select>
+            <button class="join-btn back-btn" onclick="toggleSettings()" style="margin-top:10px;">Închide</button>
+        </div>
+    </div>
+
+    <div id="chat-container" class="chat-container" style="display: none;">
+        <div class="chat-header">
+            <span style="font-weight:600;">Chat Live</span>
+            <button onclick="toggleChatUI()" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:16px;">✖</button>
+        </div>
+        <div id="chat-messages" class="chat-messages"></div>
+        <div class="chat-input-area">
+            <input type="file" id="fileInput" style="display: none;" onchange="sendFile()">
+            <button onclick="document.getElementById('fileInput').click()" style="padding: 10px; background: var(--border-color); border:none; color:white; border-radius: 8px; cursor:pointer;" title="Atașează Fișier">📎</button>
+            <input type="text" id="msgInput" placeholder="Scrie un mesaj..." onkeypress="handleKeyPress(event)">
+            <button onclick="sendTextMessage()" style="padding: 10px 16px; background: var(--accent); border:none; color:white; border-radius: 8px; cursor:pointer; font-weight:bold;" title="Trimite">➤</button>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
